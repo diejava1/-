@@ -1,0 +1,52 @@
+' 图4-4 宿主、共享 Plugin API 与供应商插件的依赖图
+' 实线：编译依赖或宿主内部调用。虚线：运行时加载。
+@startuml
+skinparam shadowing false
+skinparam dpi 140
+skinparam defaultFontName "WenQuanYi Micro Hei"
+skinparam defaultFontSize 14
+skinparam roundcorner 6
+skinparam nodesep 18
+skinparam ranksep 26
+skinparam ArrowColor #333333
+skinparam ArrowFontSize 13
+skinparam PackageBorderColor #4B4F51
+skinparam PackageFontColor #222222
+skinparam PackageFontStyle bold
+skinparam RectangleBorderColor #4B4F51
+skinparam RectangleFontColor #222222
+skinparam LegendBorderColor #4B4F51
+skinparam LegendBackgroundColor #FFFFFF
+skinparam LegendFontColor #222222
+
+package "宿主" #E8F5E9 {
+  rectangle "微内核" as Core #E2E2F0
+  rectangle "价格库存同步模块" as Sync #E2E2F0
+  rectangle "插件运行时" as Runtime #E2E2F0
+  rectangle "执行单持久化模块" as Store #E2E2F0
+}
+
+rectangle "PF4J 插件框架" as Pf4j #FFF3E0
+rectangle "Plugin API\n共享契约" as Api #F3F0F7
+
+package "供应商插件" #E3F2FD {
+  rectangle "扩展实现" as Impl #E2E2F0
+  rectangle "私有 SDK" as Sdk #E2E2F0
+}
+
+Core -down-> Store : 内部调用
+Core -down-> Api : 编译依赖
+Sync -down-> Api : 编译依赖
+Runtime -down-> Api : 编译依赖
+Runtime -down-> Pf4j : 编译依赖
+Impl -up-> Api : 编译依赖\n并实现扩展点
+Impl -right-> Sdk : 内部依赖
+Runtime .down.> Impl : 运行时加载
+
+legend bottom
+  实线：编译依赖或宿主内部调用。
+  虚线：仅插件运行时对扩展实现的运行时加载。
+  宿主不编译依赖供应商实现。插件不依赖执行单持久化模块。私有 SDK 留在插件内部。
+endlegend
+
+@enduml

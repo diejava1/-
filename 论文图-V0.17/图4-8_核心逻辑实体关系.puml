@@ -1,0 +1,56 @@
+' 图4-8 核心逻辑实体关系图
+' 只标逻辑基数，不写未经核对的字段名和物理外键。
+@startuml
+skinparam shadowing false
+skinparam dpi 140
+skinparam defaultFontName "WenQuanYi Micro Hei"
+skinparam defaultFontSize 14
+skinparam roundcorner 6
+skinparam nodesep 50
+skinparam ranksep 42
+skinparam ArrowColor #333333
+skinparam ArrowFontSize 13
+skinparam ClassBorderColor #4B4F51
+skinparam ClassFontColor #222222
+skinparam LegendBorderColor #4B4F51
+skinparam LegendBackgroundColor #FFFFFF
+skinparam LegendFontColor #222222
+
+hide circle
+hide members
+hide methods
+
+together {
+  class "商品关联" as Goods #E8F5E9
+  class "本地价格日历" as Calendar #E8F5E9
+}
+
+together {
+  class "插件记录" as Plugin #FFF3E0
+  class "本地执行单" as Exec #E8F5E9
+  class "供应商订单关联" as ExtOrder #E3F2FD
+}
+
+together {
+  class "业务身份与\n供应商配置" as Id #FFF3E0
+  class "调用记录" as Call #FFF3E0
+  class "电子凭证" as Voucher #E3F2FD
+  class "退款执行记录" as Refund #FFF3E0
+}
+
+Goods -down-> Exec : 1:N
+Goods -down-> Calendar : 1:N
+Exec -right-> ExtOrder : 1:0..1
+Exec -down-> Voucher : 1:N
+Exec -down-> Refund : 1:N
+Exec -left-> Call : 1:N
+Plugin -down-> Id : 1:N 绑定
+Plugin -down-> Call : 1:N
+Refund -left-> Voucher : 多对多\n按退款范围
+
+legend bottom
+  1:N 表示零个或多个。1:0..1 表示没有或只有一个。
+  图中不预设物理外键和字段名。
+endlegend
+
+@enduml
