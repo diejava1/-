@@ -1,81 +1,89 @@
-' 图4-5 供应商侧交易执行的业务状态约束图
-' 三组约束分开画，不并成一条状态链。价格库存不进入本图。
-' 不使用未经核对的代码枚举。B 的下单完成不标注外部锁库成功。
-@startuml
-skinparam shadowing false
-skinparam dpi 140
-skinparam defaultFontName "WenQuanYi Micro Hei"
-skinparam defaultFontSize 13
-skinparam roundcorner 8
-skinparam nodesep 24
-skinparam ranksep 28
-skinparam ArrowColor #333333
-skinparam ArrowFontSize 12
-skinparam state {
-  BorderColor #4B4F51
-  FontColor #222222
-  BackgroundColor #FFFFFF
-  AttributeFontSize 12
-  AttributeFontColor #333333
-  StartColor #333333
-  EndColor #333333
+' 重新出图：dot -Tpng 图4-5_业务状态约束.dot -o 图4-5_业务状态约束.png
+@startdot
+digraph G {
+  graph [
+    rankdir=TB,
+    splines=ortho,
+    nodesep=0.55,
+    ranksep=0.62,
+    pad=0.4,
+    bgcolor=white,
+    fontname="WenQuanYi Micro Hei"
+  ];
+  node [
+    shape=box,
+    style="filled,rounded",
+    fontname="WenQuanYi Micro Hei",
+    fontsize=14,
+    fillcolor=white,
+    color="#4B4F51",
+    penwidth=1.2,
+    margin="0.18,0.10",
+    height=0.48
+  ];
+  edge [
+    fontname="WenQuanYi Micro Hei",
+    fontsize=12,
+    color="#333333",
+    penwidth=1.1,
+    arrowsize=0.7
+  ];
+
+  subgraph cluster_phase {
+    label="执行阶段";
+    labelloc=t;
+    fontname="WenQuanYi Micro Hei";
+    fontsize=15;
+    style=filled;
+    fillcolor="#E8F5E9";
+    color="#4B4F51";
+    margin=16;
+    s0 [label="下单阶段待处理"];
+    s1 [label="下单阶段已处理"];
+    s5 [label="占用已撤销"];
+    s2 [label="支付阶段待处理"];
+    s3 [label="出票待确认"];
+    s4 [label="出票已确认"];
+    { rank=same; s1; s5 }
+    { rank=same; s3; s4 }
+    s0 -> s1 [label="阶段完成，B不表示外部锁库"];
+    s1 -> s5 [label="支付前逆向"];
+    s1 -> s2 [label="进入支付阶段"];
+    s2 -> s3 [label="尚无最终出票事实"];
+    s2 -> s4 [label="当次已确定出票"];
+    s3 -> s4 [label="查询确认出票"];
+  }
+
+  subgraph cluster_ticket {
+    label="凭证约束";
+    labelloc=t;
+    fontname="WenQuanYi Micro Hei";
+    fontsize=15;
+    style=filled;
+    fillcolor="#E3F2FD";
+    color="#4B4F51";
+    margin=16;
+    v0 [label="凭证未保存"];
+    v1 [label="凭证已保存"];
+    v2 [label="使用事实已更新"];
+    v0 -> v1 [label="出票事实已确认"];
+    v1 -> v2 [label="核销通知"];
+  }
+
+  subgraph cluster_refund {
+    label="退款约束";
+    labelloc=t;
+    fontname="WenQuanYi Micro Hei";
+    fontsize=15;
+    style=filled;
+    fillcolor="#FFF3E0";
+    color="#4B4F51";
+    margin=16;
+    r0 [label="退款待执行"];
+    r1 [label="退款已受理"];
+    r2 [label="退款已完成"];
+    r0 -> r1 [label="外部受理"];
+    r1 -> r2 [label="确认完成"];
+  }
 }
-
-state "执行阶段" as Phase #E8F5E9 {
-  state "下单阶段待处理" as S0
-  state "下单阶段已处理" as S1
-  state "支付阶段待处理" as S2
-  state "出票待确认" as S3
-  state "出票已确认" as S4
-  state "占用已撤销" as S5
-
-  S1 : 供应商 A：保存实际外部结果与关联
-  S1 : 供应商 B：只表示本地衔接完成
-  S1 : 不表示外部锁库或建单成功
-  S4 : 迟到的中间结果不能回退已确认事实
-
-  [*] --> S0 : 受理下单命令
-  S0 --> S1 : 阶段处理完成\n且请求身份有效
-  S1 --> S2 : 上游进入支付阶段
-  S2 --> S3 : 已受理，尚无最终出票事实
-  S2 --> S4 : 当次响应已确定出票
-  S3 --> S4 : 查询得到确定出票事实
-  S3 --> S3 : 查询失败或仍处理中\n保留已有事实
-  S1 --> S5 : 支付前逆向\n外部结果已确定
-}
-
-state "凭证约束" as Ticket #E3F2FD {
-  state "凭证未保存" as V0
-  state "凭证已保存" as V1
-  state "使用事实已更新" as V2
-
-  V1 : 保存凭证需要可确认的出票事实
-  V2 : 核销只更新使用数量
-  V2 : 不把执行单改为已出票
-
-  [*] --> V0
-  V0 --> V1 : 出票事实已确认
-  V1 --> V2 : 核销通知通过关联与幂等
-  V2 --> V2 : 重复通知不累加
-}
-
-state "退款约束" as Refund #FFF3E0 {
-  state "退款待执行" as R0
-  state "退款已受理" as R1
-  state "退款已完成" as R2
-
-  R1 : 受理不等于最终成功
-  R2 : 资金结算仍在上游
-
-  [*] --> R0 : 上游发起退款\n身份与数量有效
-  R0 --> R1 : 外部受理
-  R1 --> R2 : 查询或退款通知确认完成
-  R1 --> R1 : 重复请求返回已有进展
-}
-
-legend bottom
-  三组约束分别表达，不合并为一条状态链。
-  价格库存同步不进入本图。核销通知和退款通知都不用于完成出票。
-endlegend
-
-@enduml
+@enddot
