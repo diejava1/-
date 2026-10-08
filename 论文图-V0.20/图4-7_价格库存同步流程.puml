@@ -1,0 +1,95 @@
+' 图4-7 价格库存同步流程
+' 与图4-6同一套泳道配色。不创建执行单，不进入交易状态机。
+@startuml
+skinparam shadowing false
+skinparam dpi 140
+skinparam defaultFontName "WenQuanYi Micro Hei"
+skinparam defaultFontSize 14
+skinparam roundcorner 6
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 16
+skinparam BoxPadding 14
+
+skinparam sequence {
+  ArrowColor #333333
+  ArrowFontSize 14
+  ActorBorderColor #4B4F51
+  ActorBackgroundColor #FFFFFF
+  ActorFontColor #222222
+  ActorFontSize 14
+  ParticipantBorderColor #4B4F51
+  ParticipantBackgroundColor #E2E2F0
+  ParticipantFontColor #222222
+  ParticipantFontSize 14
+  LifeLineBorderColor #8E958E
+  LifeLineBackgroundColor #FFFFFF
+  BoxBorderColor #4B4F51
+  BoxFontColor #222222
+  BoxFontSize 15
+  BoxFontStyle bold
+  GroupBorderColor #333333
+  GroupFontColor #222222
+  GroupHeaderFontColor #222222
+  GroupBodyBackgroundColor transparent
+  GroupHeaderBackgroundColor #FFFFFF
+}
+
+actor "同步触发" as Trigger
+
+box "核心交易层" #E8F5E9
+participant "价格库存\n同步模块" as Sync
+participant "商品关联" as Rel
+participant "本地价格日历" as Calendar
+end box
+
+box "插件运行层" #FFF3E0
+participant "插件运行时" as Runtime
+end box
+
+box "供应商插件层" #E3F2FD
+participant "价格库存扩展" as Ext
+end box
+
+actor "供应商系统" as Supplier
+
+autonumber
+
+Trigger -> Sync : 触发同步\n定时或数据变更通知
+activate Sync
+Sync -> Rel : 读取商品关联与日期范围
+activate Rel
+Rel --> Sync : 返回供应商与外部产品身份
+deactivate Rel
+
+Sync -> Runtime : 请求价格库存能力
+activate Runtime
+Runtime -> Runtime : 核对绑定、状态与能力唯一性
+Runtime -> Ext : 调用价格库存扩展
+activate Ext
+Ext -> Ext : 换算组合价格与可售数量
+Ext -> Supplier : 拉取价格与库存
+activate Supplier
+Supplier --> Ext : 返回原始数据
+deactivate Supplier
+Ext -> Ext : 映射为标准日历
+Ext --> Runtime : 返回标准结果
+deactivate Ext
+Runtime --> Sync : 返回标准结果
+deactivate Runtime
+
+alt 取得有效结果
+  Sync -> Sync : 校验日期、价格与可售语义
+  Sync -> Calendar : 按业务键比较\n只更新有变化的记录
+  activate Calendar
+  Calendar --> Sync : 更新完成
+  deactivate Calendar
+else 未取得有效响应
+  Sync -> Sync : 保留最近一次可用记录\n不解释为库存为零
+else 供应商明确停售
+  Sync -> Calendar : 按可售语义更新对应范围
+else 部分范围异常
+  Sync -> Calendar : 保留其余有效结果\n不用残缺响应覆盖全部日历
+end
+deactivate Sync
+
+@enduml
