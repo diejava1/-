@@ -1,0 +1,69 @@
+' 图5-6 核销或退款通知。插件只做校验和转换，不出票完成。
+@startuml
+skinparam shadowing false
+skinparam dpi 140
+skinparam defaultFontName "WenQuanYi Micro Hei"
+skinparam defaultFontSize 14
+skinparam roundcorner 6
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 16
+skinparam BoxPadding 14
+
+skinparam sequence {
+  ArrowColor #333333
+  ArrowFontSize 14
+  ActorBorderColor #4B4F51
+  ActorBackgroundColor #FFFFFF
+  ActorFontColor #222222
+  ActorFontSize 14
+  ParticipantBorderColor #4B4F51
+  ParticipantBackgroundColor #E2E2F0
+  ParticipantFontColor #222222
+  ParticipantFontSize 14
+  LifeLineBorderColor #8E958E
+  LifeLineBackgroundColor #FFFFFF
+  BoxBorderColor #4B4F51
+  BoxFontColor #222222
+  BoxFontSize 15
+  BoxFontStyle bold
+  GroupBorderColor #333333
+  GroupFontColor #222222
+  GroupHeaderFontColor #222222
+  GroupBodyBackgroundColor transparent
+  GroupHeaderBackgroundColor #FFFFFF
+}
+
+actor "供应商系统" as Supplier
+participant "统一回调入口" as Entry
+
+box "供应商插件层" #E3F2FD
+participant "供应商插件" as Plugin
+end box
+
+box "核心交易层" #E8F5E9
+participant "微内核" as Core
+end box
+
+autonumber
+
+Supplier -> Entry : 发送核销或退款通知
+activate Entry
+Entry -> Plugin : 按供应商标识定位解析能力
+activate Plugin
+Plugin -> Plugin : 校验协议并转换为标准事件
+Plugin --> Entry : 返回标准通知
+deactivate Plugin
+Entry -> Core : 提交标准通知
+deactivate Entry
+activate Core
+
+alt 无法关联
+  Core -> Core : 拒绝更新，保留可核对记录
+else 重复通知
+  Core -> Core : 返回已有结果，不重复计数
+else 可以处理
+  Core -> Core : 校验幂等与数量后条件更新
+end
+deactivate Core
+
+@enduml
